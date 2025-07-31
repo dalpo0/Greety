@@ -1,34 +1,23 @@
-import sqlite3
-from datetime import datetime
+import os
+from sqlalchemy import create_engine, Column, Integer, String, Float
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 
-class UserDatabase:
-    def __init__(self, db_path='greety.db'):
-        self.conn = sqlite3.connect(db_path)
-        self._init_db()
+Base = declarative_base()
 
-    def _init_db(self):
-        with self.conn:
-            self.conn.execute("""
-                CREATE TABLE IF NOT EXISTS users (
-                    user_id INTEGER PRIMARY KEY,
-                    username TEXT,
-                    first_name TEXT,
-                    chat_id INTEGER,
-                    latitude REAL,
-                    longitude REAL,
-                    join_date TEXT
-                )""")
+class User(Base):
+    __tablename__ = 'users'
+    id = Column(Integer, primary_key=True)
+    latitude = Column(Float)
+    longitude = Column(Float)
 
-    def log_join(self, user_id, username, first_name, chat_id):
-        with self.conn:
-            self.conn.execute(
-                "INSERT OR IGNORE INTO users VALUES (?, ?, ?, ?, NULL, NULL, ?)",
-                (user_id, username, first_name, chat_id, datetime.now().isoformat())
-            )
+class Database:
+    def __init__(self, connection_url):
+        self.engine = create_engine(connection_url)
+        Base.metadata.create_all(self.engine)
+        self.Session = sessionmaker(bind=self.engine)
 
-    def update_location(self, user_id, lat, lng):
-        with self.conn:
-            self.conn.execute(
-                "UPDATE users SET latitude = ?, longitude = ? WHERE user_id = ?",
-                (lat, lng, user_id)
-            )
+    def log_location(self, user_id, lat, lng):
+        with self.Session() as session:
+            session.merge(User(id=user_id, latitude=lat, longitude=lng))
+            session.commit()
