@@ -1,97 +1,51 @@
 import os
-import logging
-from telegram import (
-    Update,
-    KeyboardButton,
-    ReplyKeyboardMarkup,
-    ReplyKeyboardRemove
-)
+from telegram import Update
 from telegram.ext import (
-    Updater,
+    ApplicationBuilder,
     CommandHandler,
     MessageHandler,
-    Filters,
-    CallbackContext,
-    ChatMemberHandler
+    filters
 )
-from bot.database import UserDatabase
+from bot.database import Database
 from bot.location import LocationService
-from bot.admin import AdminPanel
-
-# Initialize services
-db = UserDatabase()
-geo = LocationService()
-admin = AdminPanel(db)
 
 class GreetyBot:
     def __init__(self):
-        self.updater = Updater(os.getenv('BOT_TOKEN'))
-        self._setup_handlers()
-        logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                          level=logging.INFO)
+        self.db = Database(os.getenv('DATABASE_URL'))
+        self.geo = LocationService()
+        self.app = ApplicationBuilder() \
+            .token(os.getenv('BOT_TOKEN')) \
+            .post_init(self._register_webhook) \
+            .build()
 
-    def _setup_handlers(self):
-        dp = self.updater.dispatcher
-        
-        # Core functionality
-        dp.add_handler(ChatMemberHandler(self._handle_chat_member))
-        dp.add_handler(MessageHandler(Filters.location, self._handle_location))
-        
-        # Admin commands
-        dp.add_handler(CommandHandler("settings", admin.settings_panel))
-        dp.add_handler(CommandHandler("stats", admin.get_stats))
-        
-        # User commands
-        dp.add_handler(CommandHandler("start", self._send_welcome))
-
-    async def _handle_chat_member(self, update: Update, context: CallbackContext):
-        """Handle new member joins"""
-        new_member = update.chat_member.new_chat_member
-        if new_member.status == 'member':
-            user = new_member.user
-            chat_id = update.chat_member.chat.id
-            
-            # Save user to database
-            db.log_join(user.id, user.username, user.first_name, chat_id)
-            
-            # Request location
-            await self._request_location(user.id, chat_id)
-
-    async def _request_location(self, user_id: int, chat_id: int):
-        """Send location request keyboard"""
-        keyboard = [
-            [KeyboardButton("📍 Share Location", request_location=True)]
-        ]
-        await self.updater.bot.send_message(
-            chat_id=user_id,
-            text="Help us welcome you properly!",
-            reply_markup=ReplyKeyboardMarkup(
-                keyboard, 
-                one_time_keyboard=True,
-                resize_keyboard=True
-            )
+    async def _register_webhook(self, app):
+        await app.bot.set_webhook(
+            url=f"https://{os.getenv('RENDER_EXTERNAL_URL')}/webhook",
+            allowed_updates=Update.ALL_TYPES
         )
 
-    async def _handle_location(self, update: Update, context: CallbackContext):
-        """Process received location"""
+    def setup_handlers(self):
+        self.app.add_handler(CommandHandler("start", self.start))
+        self.app.add_handler(MessageHandler(filters.LOCATION, self.handle_location))
+
+    async def start(self, update: Update, context):
+        await update.message.reply_text("Greety Bot Online! ✅")
+
+    async def handle_location(self, update: Update, context):
         user = update.effective_user
-        location = update.message.location
-        
-        # Get localized welcome
-        welcome_msg = await geo.generate_welcome(user, location)
-        
-        # Send to group
-        await update.message.reply_text(
-            welcome_msg,
-            reply_markup=ReplyKeyboardRemove()
-        )
-        
-        # Update user record
-        db.update_location(user.id, location.latitude, location.longitude)
+        loc = update.message.location
+        welcome = await self.geo.generate_welcome(user, loc)
+        await update.message.reply_text(welcome)
+        self.db.log_location(user.id, loc.latitude, loc.longitude)
 
     def run(self):
-        self.updater.start_polling()
-        self.updater.idle()
+        self.setup_handlers()
+        self.app.run_webhook(
+            listen="0.0.0.0",
+            port=int(os.getenv("PORT", 10000)),
+            webhook_url=f"https://{os.getenv('RENDER_EXTERNAL_URL')}/webhook",
+            secret_token=os.getenv('WEBHOOK_SECRET')
+        )
 
 if __name__ == '__main__':
     GreetyBot().run()
