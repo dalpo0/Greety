@@ -1,16 +1,41 @@
-# ✨ Greety - Advanced Telegram Welcome Bot
+# 🌟 Greety - Advanced Telegram Welcome Bot
 
-![Demo](https://i.imgur.com/example.png)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/yourusername/greety-bot)
 
-## Features
-- Customizable welcome messages
-- Admin control panel
-- Security systems (captcha/restrictions)
-- Database storage
+Automated welcome messages with location detection, admin controls, and PostgreSQL integration.
 
-## Quick Start
-1. Add your bot token in `.env`
-2. Deploy to [Railway](https://railway.app) or similar
-3. Use `/customize` as admin to configure
+![Demo](https://i.imgur.com/welcome-demo.gif)
 
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=...)
+## ✨ Features
+
+- **Personalized Welcomes**  
+  Uses member's location for city/timezone detection
+- **Admin Dashboard**  
+  `/settings` menu for easy customization
+- **Auto-Restrictions**  
+  Temporary limits for new members
+- **Database Backed**  
+  PostgreSQL storage for user data
+- **Multi-Platform Ready**  
+  Works on Render, Railway, or any Python host
+
+## 🚀 Quick Deployment
+
+### 1. One-Click Install
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/yourusername/greety-bot)
+
+### 2. Manual Setup
+```bash
+# Clone repository
+git clone https://github.com/yourusername/greety-bot.git
+cd greety-bot
+
+# Set up environment
+cp .env.example .env
+nano .env  # Fill your credentials
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run locally
+python -m bot.main
